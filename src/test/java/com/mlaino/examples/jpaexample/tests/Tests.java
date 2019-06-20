@@ -13,18 +13,15 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit4.SpringRunner;
 
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import javax.transaction.Transactional;
-import java.awt.*;
 import java.util.Arrays;
 
-//@ExtendWith(SpringExtension.class)
-//@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @RunWith(SpringRunner.class)
 @SpringBootTest
 public class Tests {
@@ -41,6 +38,8 @@ public class Tests {
 
     @PersistenceContext
     private EntityManager entityManager;
+
+    private long exampleEmployeeId;
 
     private Employee createEmployee(String firstName, String lastName) {
         var emp = new Employee();
@@ -71,14 +70,17 @@ public class Tests {
         parkingLot.setLotNumber(1);
         emp.setParkingLot(parkingLot);
         emp.addProject(projectRepository.findByName(METROMILE).get());
-        employeeRepository.save(emp);
+        emp = employeeRepository.save(emp);
+        exampleEmployeeId = emp.getId();
     }
 
     /**
      * ParkingLot is a one-to-one relationship with the default FetchType of EAGER.
      */
     @Test
-    public void testMergeEmployeeAndParkingLot() {
+    // This annotation is needed so that the context is correctly cleared before each test.
+    @DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_EACH_TEST_METHOD)
+    public void testGetEmployeeAndParkingLot() {
         var emp = employeeRepository.findByFirstName("Matias").get(0);
 
         assert (emp.getParkingLot() != null);
@@ -89,9 +91,11 @@ public class Tests {
      * since there is no transaction open.
      */
     @Test(expected = LazyInitializationException.class)
+    @DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_EACH_TEST_METHOD)
     public void testProjectsNotReturnedFromRepository() {
-        var emp = entityManager.find(Employee.class, 1L);
-        Assert.assertNotEquals(0, emp.getProjects().size());
+        var emp = entityManager.find(Employee.class, exampleEmployeeId);
+        var projects = emp.getProjects();
+        Assert.assertNotEquals(0, projects.size());
         Assert.fail("LazyInitializationException should have been thrown by now");
     }
 
@@ -101,8 +105,9 @@ public class Tests {
      */
     @Test
     @Transactional
+    @DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_EACH_TEST_METHOD)
     public void testProjectsReturnedFromRepositoryTransactional() {
-        var emp = entityManager.find(Employee.class, 1L);
+        var emp = entityManager.find(Employee.class, exampleEmployeeId);
         Assert.assertNotEquals(0, emp.getProjects().size());
     }
 }
